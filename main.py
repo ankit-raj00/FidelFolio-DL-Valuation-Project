@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 import tensorflow as tf
+import json # Added json import
 
 # Import local modules
 # Ensure src is in path if running directly
@@ -14,18 +15,32 @@ from src.utils import load_config
 from src.data import load_data, clean_column_names, convert_to_numeric, impute_data, scale_features, cap_outliers
 from src.features import create_yoy_diffs, apply_pca, create_sequences
 from src.models import build_mlp_model, build_lstm_model, build_encoder_decoder_model
+from src.utils.logger import setup_logger # Added setup_logger import
+
+# Initialize Logger (Default)
+logger = setup_logger()
 
 def main():
     parser = argparse.ArgumentParser(description="FidelFolio ML Pipeline")
     parser.add_argument("--config", type=str, default="config/config.yaml", help="Path to config file")
     args = parser.parse_args()
 
+    # Initialize a default logger first to handle potential config loading errors
+    global logger
+    logger = setup_logger()
+
     # 1. Load Configuration
+    logger.info(f"Loading configuration from {args.config}")
     try:
         config = load_config(args.config)
-        print(f"Loaded configuration from {args.config}")
+        
+        # Re-initialize logger with model name from config
+        model_type = config['training'].get('model_type', 'mlp')
+        logger = setup_logger(model_name=model_type)
+        logger.info(f"Loaded configuration from {args.config}. Logger updated for model: {model_type}")
+        
     except Exception as e:
-        print(f"Error loading config: {e}")
+        logger.error(f"Error loading config: {e}")
         return
 
     # 2. Load Data
@@ -33,16 +48,16 @@ def main():
     try:
         df = load_data(data_path)
     except FileNotFoundError:
-        print(f"Data file not found at {data_path}. Please place 'FidelFolio_Dataset.csv' in the data directory.")
+        logger.error(f"Data file not found at {data_path}. Please place 'FidelFolio_Dataset.csv' in the data directory.") # Changed print to logger.error
         return
 
     # 3. Initial Preprocessing
-    print("--- 1. Cleaning & Numeric Conversion ---")
+    logger.info("--- 1. Cleaning & Numeric Conversion ---") # Changed print to logger.info
     df = clean_column_names(df)
     df = convert_to_numeric(df, ignore_cols=[config['data']['id_col']])
 
     # 4. Feature Engineering (YoY Diffs)
-    print("--- 2. Feature Engineering (YoY Diffs) ---")
+    logger.info("--- 2. Feature Engineering (YoY Diffs) ---") # Changed print to logger.info
     id_col = config['data']['id_col']
     year_col = config['data']['year_col']
     target_cols = config['data']['target_cols']
@@ -51,7 +66,7 @@ def main():
     df, new_features = create_yoy_diffs(df, id_col, year_col, target_cols=target_cols)
 
     # 5. Advanced Preprocessing (Imputation, Scaling, Capping)
-    print("--- 3. Imputation, Scaling, Capping ---")
+    logger.info("--- 3. Imputation, Scaling, Capping ---") # Changed print to logger.info
     # Identify columns to process: Original Numeric + Engineered
     numeric_cols = df.select_dtypes(include=np.number).columns
     cols_to_process = [c for c in numeric_cols if c not in target_cols + [year_col]]
@@ -68,19 +83,19 @@ def main():
     # 6. PCA (Optional)
     feature_cols_for_model = cols_to_process # Default
     if config['preprocessing']['pca']['enabled']:
-        print("--- 4. PCA ---")
+        logger.info("--- 4. PCA ---") # Changed print to logger.info
         df, pc_cols, pca_model = apply_pca(df, cols_to_process, variance_ratio=config['preprocessing']['pca']['variance_ratio'])
         if pc_cols:
             feature_cols_for_model = pc_cols
 
     # 7. Encode ID
-    print("--- 5. Encoding Company IDs ---")
+    logger.info("--- 5. Encoding Company IDs ---") # Changed print to logger.info
     le = LabelEncoder()
     df['Company_ID_Encoded'] = le.fit_transform(df[id_col])
     num_companies = df['Company_ID_Encoded'].nunique()
     
     # 8. Scale Targets (Independently)
-    print("--- 6. Scaling Targets ---")
+    logger.info("--- 6. Scaling Targets ---") # Changed print to logger.info
     target_scalers = {}
     for t in target_cols:
         _, t_scaler = scale_features(df, [t]) # Scale in place for df, but get scaler
@@ -88,12 +103,19 @@ def main():
 
     # 9. Training Loop (Expanding Window)
     model_type = config['training'].get('model_type', 'mlp')
-    print(f"--- 7. Starting Training ({model_type.upper()}) ---")
+    logger.info(f"--- 7. Starting Training ({model_type.upper()}) ---")
     unique_years = sorted(df[year_col].unique())
     min_history = config['preprocessing']['sequence_generation']['min_history_years']
     
+    metrics_file = "metrics.json"
+    if os.path.exists(metrics_file):
+        with open(metrics_file, 'r') as f:
+            all_metrics = json.load(f)
+    else:
+        all_metrics = []
+    
     if len(unique_years) <= min_history:
-        print("Not enough history for training.")
+        logger.warning("Not enough history for training.") # Changed print to logger.warning
         return
 
     metrics = []
@@ -102,7 +124,7 @@ def main():
         test_year = unique_years[i]
         train_end_year = unique_years[i-1]
         
-        print(f"\n=== Fold: Test Year {test_year} (Train <= {train_end_year}) ===")
+        logger.info(f"\n=== Fold: Test Year {test_year} (Train <= {train_end_year}) ===")
         
         # Split Data
         train_df = df[df[year_col] <= train_end_year]
@@ -118,10 +140,10 @@ def main():
         )
         
         if len(X_train_seq) == 0:
-            print("No training data generated.")
+            logger.warning("No training data generated.")
             continue
             
-        print(f"Training Samples: {len(X_train_seq)}")
+        logger.info(f"Training Samples: {len(X_train_seq)}")
         
         # Prepare Test Data (Candidate companies in test_year)
         test_candidate_df = df[df[year_col] <= test_year]
@@ -136,7 +158,7 @@ def main():
         y_test_all = y_test_all_all[test_mask]
 
         if len(X_test_seq) == 0:
-            print(f"No test samples found for year {test_year}.")
+            logger.warning(f"No test samples found for year {test_year}.") # Changed print to logger.warning
             continue
             
         # Ensure test sequences are padded to same max_len as train
@@ -146,11 +168,11 @@ def main():
              # This strictly shouldn't happen if train set includes all history, but safe to truncate
              X_test_seq = X_test_seq[:, -max_len_train:, :]
 
-        print(f"Test Samples: {len(X_test_seq)}")
+        logger.info(f"Test Samples: {len(X_test_seq)}") # Changed print to logger.info
 
         # Train per target
         for t_idx, target_name in enumerate(target_cols):
-            print(f"  Training for {target_name}...")
+            logger.info(f"  Training for {target_name}...") # Changed print to logger.info
             y_train = y_train_all[:, t_idx]
             y_test = y_test_all[:, t_idx]
             
@@ -188,11 +210,27 @@ def main():
                 
                 # Calculate RMSE
                 rmse_original = np.sqrt(np.mean((y_pred_original - y_test_original) ** 2))
-                print(f"  Result -> Test RMSE (Original Scale): {rmse_original:.4f}")
-            else:
-                 print("  Warning: Scaler not found for inverse transform.")
+                logger.info(f"  Result -> Test RMSE (Original Scale): {rmse_original:.4f}")
 
-    print("Pipeline finished successfully.")
+                # Save Metrics to List
+                metric_entry = {
+                    "model": model_type,
+                    "test_year": int(test_year),
+                    "target": target_name,
+                    "rmse": float(rmse_original),
+                    "timestamp": pd.Timestamp.now().isoformat()
+                }
+                all_metrics.append(metric_entry)
+
+            else:
+                 logger.warning("  Warning: Scaler not found for inverse transform.")
+
+    # Save Metrics to JSON
+    with open(metrics_file, 'w') as f:
+        json.dump(all_metrics, f, indent=4)
+        logger.info(f"Metrics updated in {metrics_file}")
+
+    logger.info("Pipeline finished successfully.")
 
 if __name__ == "__main__":
     main()
