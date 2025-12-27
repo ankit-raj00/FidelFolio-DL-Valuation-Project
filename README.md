@@ -36,18 +36,14 @@ FidelFolio_Project/
 Run the training pipeline using `main.py`:
 
 ```bash
-# Run with default MLP model
+# Run the pipeline (uses config/config.yaml by default)
 python main.py
 
-# Run with LSTM model
-python main.py --model lstm
-
-# Run with Encoder-Decoder model
-python main.py --model encoder_decoder
-
-# Use a custom config file
-python main.py --config config/my_custom_config.yaml
+# Run with a specific configuration file (e.g. for testing)
+python main.py --config config/test_config.yaml
 ```
+
+To switch models (MLP / LSTM / Encoder-Decoder), edit `model_type` in `config/config.yaml`.
 
 ## Configuration
 
