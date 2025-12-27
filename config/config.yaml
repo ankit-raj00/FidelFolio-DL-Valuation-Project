@@ -1,0 +1,54 @@
+project:
+  name: "FidelFolio_DL_Valuation"
+  version: "1.0.0"
+  description: "Deep Learning models for market cap growth prediction."
+
+data:
+  raw_path: "data/FidelFolio_Dataset.csv"
+  processed_path: "data/processed/" # Optional for caching
+  target_cols:
+    - "Target 1"
+    - "Target 2"
+    - "Target 3"
+  id_col: "Company"
+  year_col: "Year"
+
+preprocessing:
+  knn_imputer:
+    n_neighbors: 5
+  outlier_capping:
+    z_score_threshold: 3.0
+  pca:
+    enabled: true
+    variance_ratio: 0.95
+  sequence_generation:
+    min_history_years: 2
+
+models:
+  common:
+    embedding_dim: 16
+    dropout_rate: 0.25
+    learning_rate: 0.0001
+  
+  mlp:
+    hidden_layers:
+      - 128
+      - 64
+  
+  lstm:
+    layer_1_units: 128
+    layer_2_units: 64
+    dense_units: 64
+  
+  encoder_decoder:
+    encoder_units: 128
+    decoder_units: 64 # Implied dense units in current architecture
+    dense_units: 64
+
+training:
+  model_type: "mlp" # Options: mlp, lstm, encoder_decoder
+  epochs: 75
+  batch_size: 32
+  validation_split: 0.15
+  early_stopping_patience: 12
+  reduce_lr_patience: 6

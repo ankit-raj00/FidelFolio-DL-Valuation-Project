@@ -1,0 +1,54 @@
+project:
+  name: "FidelFolio_DL_Test"
+  version: "1.0.0"
+  description: "Test run configuration"
+
+data:
+  raw_path: "data/FidelFolio_Dataset.csv"
+  processed_path: "data/processed/"
+  target_cols:
+    - "Target 1"
+    - "Target 2"
+    - "Target 3"
+  id_col: "Company"
+  year_col: "Year"
+
+preprocessing:
+  knn_imputer:
+    n_neighbors: 2 # Reduced for speed
+  outlier_capping:
+    z_score_threshold: 3.0
+  pca:
+    enabled: true
+    variance_ratio: 0.95
+  sequence_generation:
+    min_history_years: 1 # Minimal history for test
+
+models:
+  common:
+    embedding_dim: 8 # Small embedding
+    dropout_rate: 0.1
+    learning_rate: 0.001
+  
+  mlp:
+    hidden_layers:
+      - 32
+      - 16
+  
+  lstm:
+    layer_1_units: 32
+    layer_2_units: 16
+    dense_units: 16
+  
+  encoder_decoder:
+    encoder_units: 32
+    decoder_units: 16
+    dense_units: 16
+
+training:
+  model_type: "mlp"
+  epochs: 1 # Single epoch for speed
+  batch_size: 64
+  validation_split: 0.2
+  early_stopping_patience: 1
+  reduce_lr_patience: 1
