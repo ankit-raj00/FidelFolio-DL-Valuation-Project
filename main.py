@@ -107,12 +107,19 @@ def main():
     unique_years = sorted(df[year_col].unique())
     min_history = config['preprocessing']['sequence_generation']['min_history_years']
     
-    metrics_file = "metrics.json"
+    # Create metrics/results directory
+    results_dir = "results"
+    os.makedirs(results_dir, exist_ok=True)
+    metrics_file = os.path.join(results_dir, f"metrics_{model_type}.json")
+
+    # Load existing metrics to append to
     if os.path.exists(metrics_file):
         with open(metrics_file, 'r') as f:
             all_metrics = json.load(f)
     else:
         all_metrics = []
+    
+    current_run_metrics = [] # Track metrics for just this execution run
     
     if len(unique_years) <= min_history:
         logger.warning("Not enough history for training.") # Changed print to logger.warning
@@ -221,14 +228,47 @@ def main():
                     "timestamp": pd.Timestamp.now().isoformat()
                 }
                 all_metrics.append(metric_entry)
+                current_run_metrics.append(metric_entry)
 
             else:
                  logger.warning("  Warning: Scaler not found for inverse transform.")
 
-    # Save Metrics to JSON
+    # Save Detailed Metrics to JSON
     with open(metrics_file, 'w') as f:
         json.dump(all_metrics, f, indent=4)
-        logger.info(f"Metrics updated in {metrics_file}")
+        logger.info(f"Detailed metrics saved to {metrics_file}")
+
+    # Calculate and Save Overall Summary for Context
+    if current_run_metrics:
+        logger.info("--- Overall Performance Summary (Current Run) ---")
+        summary_df = pd.DataFrame(current_run_metrics)
+        avg_rmse = summary_df.groupby('target')['rmse'].mean().to_dict()
+        
+        summary_file = os.path.join(results_dir, f"summary_{model_type}.json")
+        
+        # Load existing summary if exists or create new
+        if os.path.exists(summary_file):
+             with open(summary_file, 'r') as f:
+                all_summaries = json.load(f)
+        else:
+             all_summaries = []
+
+        summary_entry = {
+            "timestamp": pd.Timestamp.now().isoformat(),
+            "model": model_type,
+            "average_rmse_per_target": avg_rmse,
+            "overall_mean_rmse": summary_df['rmse'].mean()
+        }
+        all_summaries.append(summary_entry)
+        
+        with open(summary_file, 'w') as f:
+            json.dump(all_summaries, f, indent=4)
+            
+        for target, score in avg_rmse.items():
+            logger.info(f"  Target: {target} | Mean RMSE: {score:.4f}")
+            
+        logger.info(f"Overall Mean RMSE: {summary_entry['overall_mean_rmse']:.4f}")
+        logger.info(f"Summary metrics saved to {summary_file}")
 
     logger.info("Pipeline finished successfully.")
 

@@ -1,6 +1,28 @@
 # FidelFolio DL Valuation Project
 
-Modular Deep Learning pipeline for predicting market capitalization growth of listed companies using fundamental financial indicators.
+## Problem Statement
+Predicting the market capitalization growth of listed companies is a complex time-series regression task. This project aims to predict future company valuation targets using historical fundamental financial indicators, addressing challenges like missing data, outliers, and temporal dependencies.
+
+## Key Features
+- **Modular Pipeline**: Clean separation of concerns (Data -> Features -> Models) for scalability.
+- **Config-Driven**: All hyperparameters and paths controlled via `config/config.yaml`.
+- **Deep Learning Architectures**:
+  - **MLP**: Baseline feed-forward network with embeddings.
+  - **LSTM**: Captures temporal trends in financial history.
+  - **Encoder-Decoder**: Advanced sequence-to-vector modeling.
+- **Robust Preprocessing**:
+  - KNN Imputation for missing values.
+  - RobustScaler for handling financial outliers.
+  - PCA for dimensionality reduction.
+- **Expanding Window Validation**: Realistic backtesting that retrains models on all available history for each test year.
+- **Automated Logging**: Timestamped, model-specific logs saved to `logs/` for full auditability.
+- **Results Tracking**: Automated storage of validation metrics (RMSE) to `metrics.json`.
+
+## Additional Documentation
+For a deeper dive into the project background and technical implementation, please refer to:
+*   **[Problem Statement PDF](FidelFolio_Problem_statement.pdf)**: Original challenge description and requirements.
+*   **[Presentation Deck (PPT)](PPT.pdf)**: Project overview slideshow.
+*   **[Implementation Details](implementation_details.md)**: Comprehensive technical guide explaining the "How" and "Why" of every pipeline step (Data Cleaning, Engineering, PCA, Model Architectures).
 
 ## Project Structure
 
