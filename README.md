@@ -61,3 +61,27 @@ Modify `config/config.yaml` to adjust:
 - **MLP**: Feed-forward network with company embeddings.
 - **LSTM**: Recurrent neural network handling sequential financial history.
 - **Encoder-Decoder**: LSTM encoder to capture context, Dense decoder for prediction.
+
+## Pipeline Flow
+
+```mermaid
+graph TD
+    A[Start: main.py] --> B{Load Config}
+    B --> C[Load Config.yaml]
+    C --> D[Load Data]
+    D --> E[Data Cleaning]
+    E --> F[Feature Engineering: YoY Diffs]
+    F --> G[Preprocessing (Impute, Scale, Cap)]
+    G --> H{PCA Enabled?}
+    H -- Yes --> I[Apply PCA]
+    H -- No --> J[Skip PCA]
+    I --> K[Encode Company IDs]
+    J --> K
+    K --> L[Start Loop (Expanding Window)]
+    L --> M[Generate Sequences]
+    M --> N[Train Model (MLP/LSTM/Enc-Dec)]
+    N --> O[Predict & Evaluate]
+    O --> P{Next Year?}
+    P -- Yes --> L
+    P -- No --> Q[Finish]
+```
